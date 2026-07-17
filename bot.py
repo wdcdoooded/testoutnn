@@ -2,7 +2,7 @@ import discord
 from discord.ext import tasks, commands
 import feedparser
 import os
-from datetime import datetime
+from datetime import datetime, time  # 1. Added 'time' import here
 import pytz
 from google import genai
 
@@ -20,11 +20,6 @@ RSS_FEEDS = [
 
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
-# 9.00AM Trigger test
-bkk_tz = pytz.timezone('Asia/Bangkok')
-target_time = datetime.time(hour=9, minute=0, tzinfo=bkk_tz)
-
-# Upgraded to commands.Bot so you can manually trigger it
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -33,19 +28,18 @@ def fetch_latest_news():
     articles = []
     for url in RSS_FEEDS:
         feed = feedparser.parse(url)
-        # Grab only the top 2 articles per feed
-        for entry in feed.entries[:2]:
+        for entry in feed.entries[:3]:
             articles.append(f"Title: {entry.title}\nSummary: {entry.get('summary', 'No summary')}\nLink: {entry.link}")
     return "\n\n".join(articles)
 
 def summarize_with_gemini(raw_news):
     prompt = (
-"คุณคือผู้ประกาศข่าวสไตล์ทางการและเป็นมืออาชีพ หน้าที่ของคุณคือสรุปข่าวภาษาอังกฤษด้านล่างนี้เป็นภาษาไทย โดยทำตามเงื่อนไขต่อไปนี้อย่างเคร่งครัด:\n"
+        "คุณคือผู้ประกาศข่าวสไตล์ทางการและเป็นมืออาชีพ หน้าที่ของคุณคือสรุปข่าวภาษาอังกฤษด้านล่างนี้เป็นภาษาไทย โดยทำตามเงื่อนไขต่อไปนี้อย่างเคร่งครัด:\n"
         "1. แบ่งประเภทข่าวออกเป็นหัวข้อหลักอย่างน้อย 5-7 หมวดหมู่ (เช่น ข่าวเทคโนโลยี, ปัญญาประดิษฐ์, ข่าวโลก, ธุรกิจ, วิทยาศาสตร์ ฯลฯ) เพื่อให้ครอบคลุมและเป็นระเบียบ\n"
         "2. ภายใต้แต่ละหมวดหมู่ ให้สรุปข่าวเป็นหัวข้อย่อยสั้นๆ กระชับและแม่นยำ โดยใช้เครื่องหมายแสดงหัวข้อย่อย (Bulletpoint)\n"
         "3. สำหรับข่าวแต่ละประเด็น ต้องแนบลิงก์แหล่งที่มา (Source Link) ที่ให้มาในรูปแบบข้อความดิบไว้ท้ายสรุปข่าวนั้นๆ เสมอ เพื่อให้ผู้ใช้อ่านต่อได้\n"
         "4. ผลลัพธ์ทั้งหมดต้องเป็นภาษาไทยที่สละสลวย อ่านง่าย สะอาดตา และไม่มีการใช้ฟอร์แมตที่ซับซ้อนเกินไป\n\n"
-        "5. เนื้อหาข่าวที่สรุปมาในแต่ละหัวข้อต้องไม่ยาวเกินกว่า 350 ตัวอักษร\n"
+        "5. เนื้อหาข่าวที่สรุปมาในแต่ละหัวข้อต้องไม่ยาวเกินกว่า 200 ตัวอักษร\n"
         f"ข้อมูลข่าวสารดิบ (Raw News):\n{raw_news}"
     )
     response = ai_client.models.generate_content(
@@ -55,7 +49,6 @@ def summarize_with_gemini(raw_news):
     return response.text
 
 async def generate_and_send_news(channel):
-    """Core logic to fetch, summarize, and post the news."""
     bkk_tz = pytz.timezone('Asia/Bangkok')
     current_time = datetime.now(bkk_tz).strftime('%Y-%m-%d %H:%M:%S')
     print(f"Executing news run at {current_time} (BKK Time)...")
@@ -71,7 +64,7 @@ async def generate_and_send_news(channel):
             summary = summary[:1900] + "\n\n*(Truncated for length)*"
             
         embed = discord.Embed(
-            title="☕ Morning News Digest", 
+            title="☕ Morning News Digest (สรุปข่าวเช้า)", 
             description=summary, 
             color=discord.Color.blue()
         )
@@ -82,25 +75,25 @@ async def generate_and_send_news(channel):
     except Exception as e:
         print(f"An error occurred: {e}")
 
-# 1. The Automatic 5-Minute Timer
-# @tasks.loop(minutes=5)
-# async def morning_news_job():
-#     channel = bot.get_channel(TARGET_CHANNEL_ID)
-#     if channel:
-#         await generate_and_send_news(channel)
-@tasks.loop(time=target_time)
+# 2. Setup the loop to run exactly at 9:00 AM Bangkok Time every day
+BKK_TZ = pytz.timezone('Asia/Bangkok')
+SCHEDULED_TIME = time(hour=9, minute=0, tzinfo=BKK_TZ)
 
-# 2. The Manual Trigger Command
+@tasks.loop(time=SCHEDULED_TIME)
+async def morning_news_job():
+    channel = bot.get_channel(TARGET_CHANNEL_ID)
+    if channel:
+        await generate_and_send_news(channel)
+
+# 3. Preserved the force test command
 @bot.command(name="testnews")
 async def test_news(ctx):
-    """Type !testnews in Discord to force the bot to run instantly."""
-    await ctx.send("Gathering the news now, give me a few seconds...")
+    await ctx.send("กำลังรวบรวมและสรุปข่าวสาร กรุณารอสักครู่...")
     await generate_and_send_news(ctx.channel)
 
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
-    # Start the automatic loop as soon as it boots
     morning_news_job.start()
 
 if __name__ == "__main__":
