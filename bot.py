@@ -42,7 +42,7 @@ def summarize_with_gemini(raw_news):
         f"Raw News:\n{raw_news}"
     )
     response = ai_client.models.generate_content(
-        model='gemini-2.5-flash',
+        model='gemini-3.5-flash',
         contents=prompt,
     )
     return response.text
