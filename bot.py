@@ -36,10 +36,12 @@ def fetch_latest_news():
 
 def summarize_with_gemini(raw_news):
     prompt = (
-        "You are a formal, professional news anchor. I will provide you with raw news articles. "
-        "Categorize these stories. Write a concise, 2-3 sentence summary for each cluster. "
-        "Remove duplicates. Do not use overly complex formatting.\n\n"
-        f"Raw News:\n{raw_news}"
+"คุณคือผู้ประกาศข่าวสไตล์ทางการและเป็นมืออาชีพ หน้าที่ของคุณคือสรุปข่าวภาษาอังกฤษด้านล่างนี้เป็นภาษาไทย โดยทำตามเงื่อนไขต่อไปนี้อย่างเคร่งครัด:\n"
+        "1. แบ่งประเภทข่าวออกเป็นหัวข้อหลักอย่างน้อย 5-7 หมวดหมู่ (เช่น ข่าวเทคโนโลยี, ปัญญาประดิษฐ์, ข่าวโลก, ธุรกิจ, วิทยาศาสตร์ ฯลฯ) เพื่อให้ครอบคลุมและเป็นระเบียบ\n"
+        "2. ภายใต้แต่ละหมวดหมู่ ให้สรุปข่าวเป็นหัวข้อย่อยสั้นๆ กระชับและแม่นยำ โดยใช้เครื่องหมายแสดงหัวข้อย่อย (Bulletpoint)\n"
+        "3. สำหรับข่าวแต่ละประเด็น ต้องแนบลิงก์แหล่งที่มา (Source Link) ที่ให้มาในรูปแบบข้อความดิบไว้ท้ายสรุปข่าวนั้นๆ เสมอ เพื่อให้ผู้ใช้อ่านต่อได้\n"
+        "4. ผลลัพธ์ทั้งหมดต้องเป็นภาษาไทยที่สละสลวย อ่านง่าย สะอาดตา และไม่มีการใช้ฟอร์แมตที่ซับซ้อนเกินไป\n\n"
+        f"ข้อมูลข่าวสารดิบ (Raw News):\n{raw_news}"
     )
     response = ai_client.models.generate_content(
         model='gemini-3.5-flash',
