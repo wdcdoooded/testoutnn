@@ -1,5 +1,5 @@
 import discord
-from discord.ext import tasks
+from discord.ext import tasks, commands
 import feedparser
 import os
 from datetime import datetime
@@ -20,14 +20,16 @@ RSS_FEEDS = [
 
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
+# Upgraded to commands.Bot so you can manually trigger it
 intents = discord.Intents.default()
 intents.message_content = True
-client = discord.Client(intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 def fetch_latest_news():
     articles = []
     for url in RSS_FEEDS:
         feed = feedparser.parse(url)
+        # Grab only the top 2 articles per feed
         for entry in feed.entries[:2]:
             articles.append(f"Title: {entry.title}\nSummary: {entry.get('summary', 'No summary')}\nLink: {entry.link}")
     return "\n\n".join(articles)
@@ -45,19 +47,15 @@ def summarize_with_gemini(raw_news):
     )
     return response.text
 
-@tasks.loop(minutes=5)
-async def morning_news_job():
-    channel = client.get_channel(TARGET_CHANNEL_ID)
-    if not channel:
-        print(f"Error: Could not find channel {TARGET_CHANNEL_ID}")
-        return
-
+async def generate_and_send_news(channel):
+    """Core logic to fetch, summarize, and post the news."""
     bkk_tz = pytz.timezone('Asia/Bangkok')
     current_time = datetime.now(bkk_tz).strftime('%Y-%m-%d %H:%M:%S')
     print(f"Executing news run at {current_time} (BKK Time)...")
 
     raw_news = fetch_latest_news()
     if not raw_news:
+        print("No news found.")
         return
 
     try:
@@ -77,13 +75,28 @@ async def morning_news_job():
     except Exception as e:
         print(f"An error occurred: {e}")
 
-@client.event
+# 1. The Automatic 5-Minute Timer
+@tasks.loop(minutes=5)
+async def morning_news_job():
+    channel = bot.get_channel(TARGET_CHANNEL_ID)
+    if channel:
+        await generate_and_send_news(channel)
+
+# 2. The Manual Trigger Command
+@bot.command(name="testnews")
+async def test_news(ctx):
+    """Type !testnews in Discord to force the bot to run instantly."""
+    await ctx.send("Gathering the news now, give me a few seconds...")
+    await generate_and_send_news(ctx.channel)
+
+@bot.event
 async def on_ready():
-    print(f'Logged in as {client.user}')
+    print(f'Logged in as {bot.user}')
+    # Start the automatic loop as soon as it boots
     morning_news_job.start()
 
 if __name__ == "__main__":
     if not DISCORD_TOKEN or not GEMINI_API_KEY:
         print("FATAL ERROR: Missing API keys in environment variables!")
     else:
-        client.run(DISCORD_TOKEN)
+        bot.run(DISCORD_TOKEN)
