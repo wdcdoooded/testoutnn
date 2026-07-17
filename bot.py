@@ -20,6 +20,10 @@ RSS_FEEDS = [
 
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
+# 9.00AM Trigger test
+bkk_tz = pytz.timezone('Asia/Bangkok')
+target_time = datetime.time(hour=9, minute=0, tzinfo=bkk_tz)
+
 # Upgraded to commands.Bot so you can manually trigger it
 intents = discord.Intents.default()
 intents.message_content = True
@@ -79,11 +83,12 @@ async def generate_and_send_news(channel):
         print(f"An error occurred: {e}")
 
 # 1. The Automatic 5-Minute Timer
-@tasks.loop(minutes=5)
-async def morning_news_job():
-    channel = bot.get_channel(TARGET_CHANNEL_ID)
-    if channel:
-        await generate_and_send_news(channel)
+# @tasks.loop(minutes=5)
+# async def morning_news_job():
+#     channel = bot.get_channel(TARGET_CHANNEL_ID)
+#     if channel:
+#         await generate_and_send_news(channel)
+@tasks.loop(time=target_time)
 
 # 2. The Manual Trigger Command
 @bot.command(name="testnews")
