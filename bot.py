@@ -2,7 +2,7 @@ import discord
 from discord.ext import tasks, commands
 import feedparser
 import os
-from datetime import datetime, time  # 1. Added 'time' import here
+from datetime import datetime, time
 import pytz
 from google import genai
 
@@ -22,7 +22,20 @@ ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+
+class NewsBot(commands.Bot):
+    async def setup_hook(self):
+        """Loads external Cogs and syncs Slash Commands automatically on boot."""
+        # Ensure cogs directory exists and load the dynamic news cog
+        if os.path.exists("./cogs/dynamic_news.py"):
+            await self.load_extension("cogs.dynamic_news")
+            print("Successfully loaded Cog: dynamic_news")
+        
+        # Sync Slash Commands globally across all servers
+        await self.tree.sync()
+        print("Synced Slash Commands with Discord.")
+
+bot = NewsBot(command_prefix="!", intents=intents)
 
 def fetch_latest_news():
     articles = []
@@ -61,8 +74,8 @@ async def generate_and_send_news(channel):
 
     try:
         summary = summarize_with_gemini(raw_news)
-        if len(summary) > 1900:
-            summary = summary[:1900] + "\n\n*(Truncated for length)*"
+        if len(summary) > 4000:
+            summary = summary[:4000] + "\n\n*(Truncated for length)*"
             
         embed = discord.Embed(
             title="☕ Morning News Digest (สรุปข่าวเช้า)", 
@@ -76,7 +89,7 @@ async def generate_and_send_news(channel):
     except Exception as e:
         print(f"An error occurred: {e}")
 
-# 2. Setup the loop to run exactly at 9:00 AM Bangkok Time every day
+# Static 9:00 AM Bangkok Time Schedule
 BKK_TZ = pytz.timezone('Asia/Bangkok')
 SCHEDULED_TIME = time(hour=9, minute=0, tzinfo=BKK_TZ)
 
@@ -86,7 +99,6 @@ async def morning_news_job():
     if channel:
         await generate_and_send_news(channel)
 
-# 3. Preserved the force test command
 @bot.command(name="testnews")
 async def test_news(ctx):
     await ctx.send("กำลังรวบรวมและสรุปข่าวสาร กรุณารอสักครู่...")
@@ -95,7 +107,8 @@ async def test_news(ctx):
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
-    morning_news_job.start()
+    if not morning_news_job.is_running():
+        morning_news_job.start()
 
 if __name__ == "__main__":
     if not DISCORD_TOKEN or not GEMINI_API_KEY:
