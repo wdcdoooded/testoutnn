@@ -35,7 +35,7 @@ class ConfirmationView(discord.ui.View):
 
     @discord.ui.button(label="ยืนยันตั้งค่า", style=discord.ButtonStyle.success, emoji="🩷")
     async def confirm_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Save to SQLite Database upon confirmation
+        # 1. Save to SQLite Database
         async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute(
                 "INSERT INTO active_jobs (user_id, channel_id, topics, time_str, days_left) VALUES (?, ?, ?, ?, ?)",
@@ -44,13 +44,10 @@ class ConfirmationView(discord.ui.View):
             job_id = cursor.lastrowid
             await db.commit()
 
-        # Add job to APScheduler
+        # 2. Add job to APScheduler
         self.cog.schedule_job(job_id, interaction.channel_id, self.topics, self.hour, self.minute)
 
-        # Disable all buttons after confirmation
-        for child in self.children:
-            child.disabled = True
-
+        # 3. Transform the message in-place and remove the buttons (view=None)
         await interaction.response.edit_message(
             content=(
                 f"💖 **บันทึกและเปิดใช้งานเรียบร้อยแล้ว!**\n"
@@ -59,12 +56,12 @@ class ConfirmationView(discord.ui.View):
                 f"📅 **ระยะเวลา:** {self.days} วัน\n"
                 f"ระบบจะเริ่มสรุปข่าวส่งเข้ามาตามเวลาที่กำหนดไว้ครับ"
             ),
-            view=self
+            view=None  # <--- Removes buttons so they can't be clicked again!
         )
 
     @discord.ui.button(label="แก้ไขข้อมูล", style=discord.ButtonStyle.secondary, emoji="💙")
     async def edit_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Re-open the modal with pre-filled inputs
+        # 1. Open the modal with pre-filled inputs
         modal = NewsSetupModal(
             cog=self.cog,
             default_topics=self.topics,
@@ -72,6 +69,12 @@ class ConfirmationView(discord.ui.View):
             default_days=str(self.days)
         )
         await interaction.response.send_modal(modal)
+
+        # 2. Try to delete the old preview message to keep chat clean
+        try:
+            await interaction.message.delete()
+        except Exception:
+            pass  # Ignore if Discord restricts deleting ephemeral messages
 
 
 class NewsSetupModal(discord.ui.Modal, title="ตั้งค่าสรุปข่าวประจำวัน (Custom News Setup)"):
