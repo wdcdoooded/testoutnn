@@ -107,7 +107,7 @@ class ResearchAssistant(commands.Cog):
         # 1. Schedule the daily 16:30 question ping
         self.scheduler.add_job(
             self.send_daily_ping,
-            trigger=CronTrigger(hour=16, minute=40, timezone=BKK_TZ),
+            trigger=CronTrigger(hour=18, minute=00, timezone=BKK_TZ),
             id="daily_research_ping",
             replace_existing=True
         )
