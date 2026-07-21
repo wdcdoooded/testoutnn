@@ -25,38 +25,43 @@ TARGET_CHANNEL_ID = 1527591728176037888  # The channel for the 16:30 ping
 
 
 # --- The Gatekeeper Logic ---
+# --- The Gatekeeper Logic ---
 def validate_topic_with_gemini(topic: str) -> tuple[str, str]:
     """Asks Gemini to verify if the topic is real, a typo, or gibberish."""
     prompt = (
-        f"You are a strict validation assistant. Evaluate this research topic requested by a user: '{topic}'.\n\n"
-        "Classify it into exactly one of three categories:\n"
-        "1. VALID: It is a real, comprehensible topic or entity.\n"
-        "2. TYPO: It contains typos but you know exactly what they meant.\n"
-        "3. GIBBERISH: It is random letters (like 'asdfg'), pure nonsense, or completely unsearchable.\n\n"
-        "Respond ONLY in this exact format: CATEGORY|SUGGESTION\n"
-        "If VALID, SUGGESTION must be NONE.\n"
-        "If TYPO, SUGGESTION must be the correctly spelled topic.\n"
-        "If GIBBERISH, SUGGESTION must be NONE.\n\n"
-        "Example 1: Solad-stete batteies -> TYPO|Solid-state batteries\n"
-        "Example 2: Artificial Intelligence -> VALID|NONE\n"
-        "Example 3: asdasdasd -> GIBBERISH|NONE"
+        f"You are an incredibly strict spelling and grammar checker. Evaluate this research topic: '{topic}'.\n"
+        "You must detect ANY misspelled words (in both Thai and English).\n\n"
+        "RULES:\n"
+        "1. If the text contains EVEN ONE spelling error or typo, you MUST output TYPO.\n"
+        "2. If it is random keyboard smashes (like 'asdfgh' or 'ฟหกด') or total nonsense, output GIBBERISH.\n"
+        "3. ONLY if it is perfectly spelled and makes logical sense, output VALID.\n\n"
+        "FORMAT: Respond ONLY with exactly CATEGORY|SUGGESTION\n"
+        "Example 1: แอปเปิ้ลวอช -> TYPO|Apple Watch (or แอปเปิลวอตช์)\n"
+        "Example 2: Solad-stete batteies -> TYPO|Solid-state batteries\n"
+        "Example 3: asdasdasd -> GIBBERISH|NONE\n"
+        "Example 4: เทคโนโลยี AI -> VALID|NONE"
     )
     try:
         response = ai_client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-3.5-flash',
             contents=prompt,
         )
-        result = response.text.strip().replace('\n', '').split('|')
+        # Strip away any markdown formatting (like **TYPO**) the AI might try to add
+        raw_text = response.text.strip().replace('\n', '').replace('`', '').replace('*', '')
+        result = raw_text.split('|')
+        
         if len(result) >= 2:
             cat = result[0].strip().upper()
             sug = result[1].strip()
+            
             if "TYPO" in cat: return "TYPO", sug
             if "GIBBERISH" in cat: return "GIBBERISH", sug
             return "VALID", "NONE"
+            
         return "VALID", "NONE"
     except Exception as e:
         print(f"Validation Guardrail Error: {e}")
-        return "VALID", "NONE"  # Fallback to allow it through if API fails
+        return "VALID", "NONE"  # Fallback to allow it through if the API temporarily fails
 
 
 # --- UI Components ---
