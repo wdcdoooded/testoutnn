@@ -11,6 +11,7 @@ DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 TARGET_CHANNEL_ID = 1527591728176037888
+GUILD_ID = 1524334060372099263  # <--- FIXED: Added back your Server ID
 
 RSS_FEEDS = [
     "http://feeds.bbci.co.uk/news/world/rss.xml",
@@ -26,14 +27,21 @@ intents.message_content = True
 class NewsBot(commands.Bot):
     async def setup_hook(self):
         """Loads external Cogs and syncs Slash Commands automatically on boot."""
-        # Ensure cogs directory exists and load the dynamic news cog
+        # Load Dynamic News Cog
         if os.path.exists("./cogs/dynamic_news.py"):
             await self.load_extension("cogs.dynamic_news")
             print("Successfully loaded Cog: dynamic_news")
-        
-        # Sync Slash Commands globally across all servers
-        await self.tree.sync()
-        print("Synced Slash Commands with Discord.")
+
+        # Load the New Deep Research Cog
+        if os.path.exists("./cogs/research_assistant.py"):
+            await self.load_extension("cogs.research_assistant")
+            print("Successfully loaded Cog: research_assistant")
+            
+        # Sync directly to Guild for instant slash command availability
+        guild = discord.Object(id=GUILD_ID)
+        self.tree.copy_global_to(guild=guild)
+        synced = await self.tree.sync(guild=guild)
+        print(f"Synced {len(synced)} Slash Command(s) directly to Guild {GUILD_ID}!")
 
 bot = NewsBot(command_prefix="!", intents=intents)
 
@@ -89,7 +97,7 @@ async def generate_and_send_news(channel):
     except Exception as e:
         print(f"An error occurred: {e}")
 
-# Static 9:00 AM Bangkok Time Schedule
+# Static Schedule
 BKK_TZ = pytz.timezone('Asia/Bangkok')
 SCHEDULED_TIME = time(hour=14, minute=42, tzinfo=BKK_TZ)
 
