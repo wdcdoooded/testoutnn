@@ -99,7 +99,7 @@ async def generate_and_send_news(channel):
 
 # Static Schedule
 BKK_TZ = pytz.timezone('Asia/Bangkok')
-SCHEDULED_TIME = time(hour=14, minute=42, tzinfo=BKK_TZ)
+SCHEDULED_TIME = time(hour=8, minute=42, tzinfo=BKK_TZ)
 
 @tasks.loop(time=SCHEDULED_TIME)
 async def morning_news_job():
